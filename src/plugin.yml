@@ -1,0 +1,8 @@
+name: DeathLockout
+main: org.kitteh.deathlockout
+author: mbaxter
+version: 1.0
+permissions:
+   deathlockout.exempt:
+       description: Exempt from being kicked on death
+       default: false
