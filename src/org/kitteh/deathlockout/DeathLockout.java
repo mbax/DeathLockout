@@ -23,6 +23,7 @@ public class DeathLockout extends JavaPlugin implements Listener {
         this.lockedOut = new HashSet<String>();
 
         this.getConfig().options().copyDefaults(true);
+        this.saveConfig();
         this.minutes = this.getConfig().getInt("timeout");
         this.timeout = this.minutes * 20 * 60;
 
