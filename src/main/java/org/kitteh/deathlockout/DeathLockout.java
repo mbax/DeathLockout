@@ -36,7 +36,6 @@ import org.bukkit.event.player.PlayerPreLoginEvent.Result;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class DeathLockout extends JavaPlugin implements Listener {
-
     private HashSet<String> lockedOut;
     private int timeout;
     private int minutes;
@@ -69,7 +68,7 @@ public class DeathLockout extends JavaPlugin implements Listener {
         }
     }
 
-    @EventHandler(priority=EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPreLogin(PlayerPreLoginEvent event) {
         if (this.lockedOut.contains(event.getName())) {
             event.disallow(Result.KICK_OTHER, ChatColor.RED.toString() + this.minutes + ChatColor.WHITE + " minutes until you revive");
