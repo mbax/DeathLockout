@@ -24,6 +24,7 @@
 package org.kitteh.deathlockout;
 
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.bukkit.ChatColor;
@@ -37,7 +38,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class DeathLockout extends JavaPlugin implements Listener {
-    private Set<String> lockedOut = new CopyOnWriteArraySet<String>();
+    private Set<UUID> lockedOut = new CopyOnWriteArraySet<UUID>();
     private int timeout;
     private int minutes;
 
@@ -54,12 +55,12 @@ public class DeathLockout extends JavaPlugin implements Listener {
     public void onDeath(EntityDeathEvent event) {
         if (event.getEntity() instanceof Player) {
             final Player died = (Player) event.getEntity();
-            final String name = died.getName();
+            final UUID uuid = died.getUniqueId();
             if (died.hasPermission("deathlockout.exempt")) {
                 this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
                     @Override
                     public void run() {
-                        final Player target = DeathLockout.this.getServer().getPlayerExact(name);
+                        final Player target = DeathLockout.this.getServer().getPlayer(uuid);
                         if (target != null) {
                             target.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
                         }
@@ -69,11 +70,11 @@ public class DeathLockout extends JavaPlugin implements Listener {
                 died.sendMessage(ChatColor.YELLOW + "       I will inform you when time would have been up.");
                 return;
             }
-            this.lockedOut.add(died.getName());
+            this.lockedOut.add(uuid);
             this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
                 @Override
                 public void run() {
-                    DeathLockout.this.lockedOut.remove(name);
+                    DeathLockout.this.lockedOut.remove(uuid);
                 }
             }, this.timeout);
             died.kickPlayer(ChatColor.WHITE + "You died. " + ChatColor.RED + this.minutes + ChatColor.WHITE + " minutes until you revive");
@@ -82,7 +83,7 @@ public class DeathLockout extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        if (this.lockedOut.contains(event.getName())) {
+        if (this.lockedOut.contains(event.getUniqueId())) {
             event.disallow(Result.KICK_OTHER, ChatColor.RED.toString() + this.minutes + ChatColor.WHITE + " minutes until you revive");
         }
     }
