@@ -54,14 +54,28 @@ public class DeathLockout extends JavaPlugin implements Listener {
     public void onDeath(EntityDeathEvent event) {
         if (event.getEntity() instanceof Player) {
             final Player died = (Player) event.getEntity();
+            final String name = died.getName();
             if (died.hasPermission("deathlockout.exempt")) {
-                this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Notify(died.getName()), this.timeout);
+                this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
+                    @Override
+                    public void run() {
+                        final Player target = DeathLockout.this.getServer().getPlayerExact(name);
+                        if (target != null) {
+                            target.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
+                        }
+                    }
+                }, this.timeout);
                 died.sendMessage(ChatColor.YELLOW + "[DeathLockout] Exempt from being kicked, you may stay.");
                 died.sendMessage(ChatColor.YELLOW + "       I will inform you when time would have been up.");
                 return;
             }
             this.lockedOut.add(died.getName());
-            this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Unlock(died.getName()), this.timeout);
+            this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
+                @Override
+                public void run() {
+                    DeathLockout.this.lockedOut.remove(name);
+                }
+            }, this.timeout);
             died.kickPlayer(ChatColor.WHITE + "You died. " + ChatColor.RED + this.minutes + ChatColor.WHITE + " minutes until you revive");
         }
     }
@@ -70,35 +84,6 @@ public class DeathLockout extends JavaPlugin implements Listener {
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         if (this.lockedOut.contains(event.getName())) {
             event.disallow(Result.KICK_OTHER, ChatColor.RED.toString() + this.minutes + ChatColor.WHITE + " minutes until you revive");
-        }
-    }
-
-    private class Unlock implements Runnable {
-        private final String name;
-
-        public Unlock(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public void run() {
-            DeathLockout.this.lockedOut.remove(this.name);
-        }
-    }
-
-    private class Notify implements Runnable {
-        private final String name;
-
-        public Notify(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public void run() {
-            final Player target = DeathLockout.this.getServer().getPlayerExact(this.name);
-            if (target != null) {
-                target.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
-            }
         }
     }
 }
