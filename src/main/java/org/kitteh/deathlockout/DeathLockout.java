@@ -23,7 +23,8 @@
  */
 package org.kitteh.deathlockout;
 
-import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -31,21 +32,18 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.player.PlayerPreLoginEvent;
-import org.bukkit.event.player.PlayerPreLoginEvent.Result;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class DeathLockout extends JavaPlugin implements Listener {
-    private HashSet<String> lockedOut;
+    private Set<String> lockedOut = new CopyOnWriteArraySet<String>();
     private int timeout;
     private int minutes;
 
     @Override
     public void onEnable() {
-        this.lockedOut = new HashSet<String>();
-
-        this.getConfig().options().copyDefaults(true);
-        this.saveConfig();
+        this.saveDefaultConfig();
         this.minutes = this.getConfig().getInt("timeout");
         this.timeout = this.minutes * 20 * 60;
 
@@ -69,7 +67,7 @@ public class DeathLockout extends JavaPlugin implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPreLogin(PlayerPreLoginEvent event) {
+    public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         if (this.lockedOut.contains(event.getName())) {
             event.disallow(Result.KICK_OTHER, ChatColor.RED.toString() + this.minutes + ChatColor.WHITE + " minutes until you revive");
         }
@@ -98,7 +96,7 @@ public class DeathLockout extends JavaPlugin implements Listener {
         @Override
         public void run() {
             final Player target = DeathLockout.this.getServer().getPlayerExact(this.name);
-            if ((target != null) && target.isOnline()) {
+            if (target != null) {
                 target.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
             }
         }
