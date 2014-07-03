@@ -6,3 +6,13 @@ permissions:
    deathlockout.exempt:
        description: Exempt from being kicked on death
        default: false
+   deathlockout.revive:
+       description: Able to let a blocked player back in early
+       default: op
+commands:
+   dlrevive:
+       description: Allow a blocked player to rejoin before their time is up
+       aliases: [revive, georges]
+       permission: deathlockout.revive
+       permission-message: You do not have permission to revive!
+       usage: /<command> playername

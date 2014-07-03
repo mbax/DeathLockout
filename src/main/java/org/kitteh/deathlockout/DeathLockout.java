@@ -23,12 +23,15 @@
  */
 package org.kitteh.deathlockout;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.ChatColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -42,9 +45,11 @@ public final class DeathLockout extends JavaPlugin implements Listener {
     private class Lockout {
         private boolean preventJoin;
         private final long time;
+        private final String username;
 
-        private Lockout() {
+        private Lockout(String username) {
             this.time = System.currentTimeMillis() + DeathLockout.this.millis;
+            this.username = username;
         }
 
         private void exempt() {
@@ -58,13 +63,34 @@ public final class DeathLockout extends JavaPlugin implements Listener {
         private long getTime() {
             return this.time;
         }
+
+        private String getUsername() {
+            return this.username;
+        }
     }
 
     private static final String FORMAT = ChatColor.RED + "%d" + ChatColor.WHITE + " %s until you revive";
 
     private final Map<UUID, Lockout> lockedOut = new ConcurrentHashMap<UUID, Lockout>();
+    private final Map<String, UUID> userMap = new HashMap<String, UUID>();
     private int millis;
     private int minutes;
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length == 0) {
+            return false;
+        }
+        final UUID uuid = this.userMap.remove(args[0].toLowerCase());
+        if (uuid == null) {
+            sender.sendMessage(ChatColor.YELLOW + "Could not find a locked out player named \"" + ChatColor.WHITE + args[0] + ChatColor.YELLOW + "\"");
+        } else {
+            Lockout lockout = this.lockedOut.remove(uuid);
+            final String name = lockout != null ? lockout.getUsername() : args[0];
+            sender.sendMessage(ChatColor.YELLOW + "[DeathLockout] " + ChatColor.WHITE + name + ChatColor.YELLOW + " can now rejoin");
+        }
+        return true;
+    }
 
     @Override
     public void onEnable() {
@@ -81,6 +107,7 @@ public final class DeathLockout extends JavaPlugin implements Listener {
                 while ((entry = iterator.next()) != null) {
                     if (entry.getValue().getTime() < currentTime) {
                         UUID uuid = entry.getKey();
+                        DeathLockout.this.userMap.remove(entry.getValue().getUsername().toLowerCase());
                         iterator.remove();
                         Player player = DeathLockout.this.getServer().getPlayer(uuid);
                         if (player != null) {
@@ -99,13 +126,15 @@ public final class DeathLockout extends JavaPlugin implements Listener {
         if (event.getEntity() instanceof Player) {
             final Player died = (Player) event.getEntity();
             final UUID uuid = died.getUniqueId();
-            Lockout lockout = new Lockout();
+            final String name = died.getName();
+            Lockout lockout = new Lockout(name);
             if (died.hasPermission("deathlockout.exempt")) {
                 died.sendMessage(ChatColor.YELLOW + "[DeathLockout] Exempt from being kicked, you may stay.");
                 died.sendMessage(ChatColor.YELLOW + "       I will inform you when time would have been up.");
                 lockout.exempt();
             } else {
                 died.kickPlayer(ChatColor.WHITE + "You died. " + String.format(FORMAT, this.minutes, "minutes"));
+                this.userMap.put(name.toLowerCase(), uuid);
             }
             this.lockedOut.put(uuid, lockout);
         }
