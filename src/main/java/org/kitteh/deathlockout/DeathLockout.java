@@ -23,9 +23,10 @@
  */
 package org.kitteh.deathlockout;
 
-import java.util.Set;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -37,16 +38,58 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class DeathLockout extends JavaPlugin implements Listener {
-    private Set<UUID> lockedOut = new CopyOnWriteArraySet<UUID>();
-    private int timeout;
+public final class DeathLockout extends JavaPlugin implements Listener {
+    private class Lockout {
+        private boolean preventJoin;
+        private final long time;
+
+        private Lockout() {
+            this.time = System.currentTimeMillis() + DeathLockout.this.millis;
+        }
+
+        private void exempt() {
+            this.preventJoin = false;
+        }
+
+        private boolean isBlocked() {
+            return this.preventJoin;
+        }
+
+        private long getTime() {
+            return this.time;
+        }
+    }
+
+    private static final String FORMAT = ChatColor.RED + "%d" + ChatColor.WHITE + " %s until you revive";
+
+    private final Map<UUID, Lockout> lockedOut = new ConcurrentHashMap<UUID, Lockout>();
+    private int millis;
     private int minutes;
 
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
         this.minutes = this.getConfig().getInt("timeout");
-        this.timeout = this.minutes * 20 * 60;
+        this.millis = this.minutes * 60 * 1000;
+
+        this.getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
+            @Override
+            public void run() {
+                long currentTime = System.currentTimeMillis();
+                Iterator<Map.Entry<UUID, Lockout>> iterator = DeathLockout.this.lockedOut.entrySet().iterator();
+                Map.Entry<UUID, Lockout> entry;
+                while ((entry = iterator.next()) != null) {
+                    if (entry.getValue().getTime() < currentTime) {
+                        UUID uuid = entry.getKey();
+                        iterator.remove();
+                        Player player = DeathLockout.this.getServer().getPlayer(uuid);
+                        if (player != null) {
+                            player.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
+                        }
+                    }
+                }
+            }
+        }, 20, 20);
 
         this.getServer().getPluginManager().registerEvents(this, this);
     }
@@ -56,35 +99,33 @@ public class DeathLockout extends JavaPlugin implements Listener {
         if (event.getEntity() instanceof Player) {
             final Player died = (Player) event.getEntity();
             final UUID uuid = died.getUniqueId();
+            Lockout lockout = new Lockout();
             if (died.hasPermission("deathlockout.exempt")) {
-                this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
-                    @Override
-                    public void run() {
-                        final Player target = DeathLockout.this.getServer().getPlayer(uuid);
-                        if (target != null) {
-                            target.sendMessage(ChatColor.YELLOW + "[DeathLockout] You would have been revived now.");
-                        }
-                    }
-                }, this.timeout);
                 died.sendMessage(ChatColor.YELLOW + "[DeathLockout] Exempt from being kicked, you may stay.");
                 died.sendMessage(ChatColor.YELLOW + "       I will inform you when time would have been up.");
-                return;
+                lockout.exempt();
+            } else {
+                died.kickPlayer(ChatColor.WHITE + "You died. " + String.format(FORMAT, this.minutes, "minutes"));
             }
-            this.lockedOut.add(uuid);
-            this.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
-                @Override
-                public void run() {
-                    DeathLockout.this.lockedOut.remove(uuid);
-                }
-            }, this.timeout);
-            died.kickPlayer(ChatColor.WHITE + "You died. " + ChatColor.RED + this.minutes + ChatColor.WHITE + " minutes until you revive");
+            this.lockedOut.put(uuid, lockout);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        if (this.lockedOut.contains(event.getUniqueId())) {
-            event.disallow(Result.KICK_OTHER, ChatColor.RED.toString() + this.minutes + ChatColor.WHITE + " minutes until you revive");
+        Lockout lockout = this.lockedOut.get(event.getUniqueId());
+        if (lockout != null && lockout.isBlocked()) {
+            long count;
+            String unit;
+            long remaining = (lockout.getTime() - System.currentTimeMillis()) / 1000;
+            if (remaining < 60) {
+                count = remaining;
+                unit = "seconds";
+            } else {
+                count = remaining / 60;
+                unit = "minutes";
+            }
+            event.disallow(Result.KICK_OTHER, String.format(FORMAT, count, unit));
         }
     }
 }
