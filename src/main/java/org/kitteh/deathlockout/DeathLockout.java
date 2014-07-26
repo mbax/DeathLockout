@@ -43,7 +43,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class DeathLockout extends JavaPlugin implements Listener {
     private class Lockout {
-        private boolean preventJoin;
+        private boolean exempt;
         private final long time;
         private final String username;
 
@@ -53,11 +53,11 @@ public final class DeathLockout extends JavaPlugin implements Listener {
         }
 
         private void exempt() {
-            this.preventJoin = false;
+            this.exempt = true;
         }
 
         private boolean isBlocked() {
-            return this.preventJoin;
+            return !this.exempt;
         }
 
         private long getTime() {
