@@ -104,7 +104,8 @@ public final class DeathLockout extends JavaPlugin implements Listener {
                 long currentTime = System.currentTimeMillis();
                 Iterator<Map.Entry<UUID, Lockout>> iterator = DeathLockout.this.lockedOut.entrySet().iterator();
                 Map.Entry<UUID, Lockout> entry;
-                while ((entry = iterator.next()) != null) {
+                while (iterator.hasNext()) {
+                    entry = iterator.next();
                     if (entry.getValue().getTime() < currentTime) {
                         UUID uuid = entry.getKey();
                         DeathLockout.this.userMap.remove(entry.getValue().getUsername().toLowerCase());
